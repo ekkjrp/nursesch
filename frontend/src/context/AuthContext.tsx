@@ -1,17 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { auth } from '../api.ts';
 
-interface User {
+interface Nurse {
   id: number;
-  wardId: number;
+  ward_id: number;
   name: string;
   email: string;
-  role: 'ADMIN' | 'NURSE';
-  skillLevel: string;
+  grade: string;  // HN | CN | RN | AN
+  sort_order: number;
+  is_night_dedicated: boolean;
+  monthly_annual_leave: number;
 }
 
 interface AuthContextValue {
-  user: User | null;
+  nurse: Nurse | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -21,13 +23,16 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>(null!);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [nurse, setNurse] = useState<Nurse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      auth.me().then(setUser).catch(() => localStorage.removeItem('token')).finally(() => setLoading(false));
+      auth.me()
+        .then(setNurse)
+        .catch(() => localStorage.removeItem('token'))
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
@@ -35,17 +40,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await auth.login(email, password);
-    localStorage.setItem('token', res.token);
-    setUser(res.nurse);
+    localStorage.setItem('token', res.access_token);
+    setNurse(res.nurse);
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
-    setUser(null);
+    setNurse(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin: user?.role === 'ADMIN' }}>
+    <AuthContext.Provider value={{
+      nurse,
+      loading,
+      login,
+      logout,
+      isAdmin: nurse?.grade === 'HN',
+    }}>
       {children}
     </AuthContext.Provider>
   );

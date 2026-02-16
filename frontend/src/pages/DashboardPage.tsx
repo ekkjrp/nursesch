@@ -1,84 +1,92 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
-import { wards, schedules, nurses as nursesApi } from '../api.ts';
+import { schedules as schedulesApi, wards as wardsApi, nurses as nursesApi } from '../api.ts';
 
-export function DashboardPage() {
-  const { user, isAdmin } = useAuth();
+export default function DashboardPage() {
+  const { nurse, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [wardInfo, setWardInfo] = useState<any>(null);
-  const [scheduleList, setScheduleList] = useState<any[]>([]);
-  const [nurseCount, setNurseCount] = useState(0);
+  const [stats, setStats] = useState({ wardName: '—', nurseCount: 0, scheduleCount: 0, draftCount: 0 });
+  const [recentSchedules, setRecentSchedules] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user) return;
-    wards.get(user.wardId).then(setWardInfo).catch(() => {});
-    schedules.list(user.wardId).then(setScheduleList).catch(() => {});
-    nursesApi.list(user.wardId).then(n => setNurseCount(n.length)).catch(() => {});
-  }, [user]);
+    if (!nurse) return;
+    Promise.all([
+      wardsApi.list(),
+      nursesApi.list(nurse.ward_id),
+      schedulesApi.list(nurse.ward_id),
+    ]).then(([wardList, nurseList, schedList]) => {
+      const ward = wardList.find((w: any) => w.id === nurse.ward_id);
+      setStats({
+        wardName: ward?.name || '—',
+        nurseCount: nurseList.length,
+        scheduleCount: schedList.length,
+        draftCount: schedList.filter((s: any) => s.status === 'DRAFT').length,
+      });
+      setRecentSchedules(schedList.slice(0, 5));
+    }).catch(() => {});
+  }, [nurse]);
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const currentSchedule = scheduleList.find(s => s.yearMonth === currentMonth);
+  const GRADE_LABEL: Record<string, string> = { HN: '수간호사', CN: '책임간호사', RN: '평간호사', AN: '보조간호사' };
 
   return (
-    <div>
+    <div className="page">
       <div className="page-header">
-        <h1>대시보드</h1>
+        <h2>대시보드</h2>
+        <div style={{ color: '#888', fontSize: 14 }}>
+          {nurse?.name} ({nurse?.grade && GRADE_LABEL[nurse.grade]})
+        </div>
       </div>
 
-      <div className="stat-grid">
+      <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-value">{wardInfo?.name || '-'}</div>
-          <div className="stat-label">소속 병동</div>
+          <div className="stat-label">병동</div>
+          <div className="stat-value">{stats.wardName}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{nurseCount}</div>
           <div className="stat-label">간호사 수</div>
+          <div className="stat-value">{stats.nurseCount}명</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{scheduleList.length}</div>
-          <div className="stat-label">근무표 수</div>
+          <div className="stat-label">전체 근무표</div>
+          <div className="stat-value">{stats.scheduleCount}개</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">
-            {currentSchedule
-              ? <span className={`badge badge-${currentSchedule.status.toLowerCase()}`}>{currentSchedule.status === 'DRAFT' ? '작성중' : '확정'}</span>
-              : '미생성'}
-          </div>
-          <div className="stat-label">이번 달 근무표</div>
+        <div className="stat-card" style={{ borderLeft: stats.draftCount > 0 ? '4px solid #E67E22' : undefined }}>
+          <div className="stat-label">작성중</div>
+          <div className="stat-value" style={{ color: stats.draftCount > 0 ? '#E67E22' : undefined }}>{stats.draftCount}개</div>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="quick-actions" style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => navigate('/nurses')}>간호사 관리</button>
+          <button className="btn btn-secondary" onClick={() => navigate('/rules')}>근무 규칙 설정</button>
+          <button className="btn btn-secondary" onClick={() => navigate('/schedules')}>근무표 생성</button>
+          <button className="btn btn-secondary" onClick={() => navigate('/requests')}>근무 요청 관리</button>
+        </div>
+      )}
 
       <div className="card">
-        <div className="card-title">최근 근무표</div>
-        {scheduleList.length === 0 ? (
-          <p style={{ color: 'var(--gray-500)', fontSize: '0.875rem' }}>
-            {isAdmin ? '아직 생성된 근무표가 없습니다. 근무표 메뉴에서 새 근무표를 생성하세요.' : '아직 근무표가 없습니다.'}
-          </p>
+        <h3 className="card-title">최근 근무표</h3>
+        {recentSchedules.length === 0 ? (
+          <p style={{ color: '#aaa' }}>생성된 근무표가 없습니다.</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>연월</th>
-                <th>상태</th>
-                <th>생성일</th>
-                <th></th>
-              </tr>
-            </thead>
+          <table className="table">
+            <thead><tr><th>연월</th><th>상태</th><th>생성일</th><th></th></tr></thead>
             <tbody>
-              {scheduleList.slice(0, 5).map(s => (
+              {recentSchedules.map((s) => (
                 <tr key={s.id}>
-                  <td>{s.yearMonth}</td>
+                  <td>{s.year_month}</td>
                   <td>
-                    <span className={`badge badge-${s.status.toLowerCase()}`}>
-                      {s.status === 'DRAFT' ? '작성중' : '확정'}
+                    <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12,
+                      background: s.status === 'CONFIRMED' ? '#EAFAF1' : '#EAF2F8',
+                      color: s.status === 'CONFIRMED' ? '#1E8449' : '#1A5276' }}>
+                      {s.status === 'CONFIRMED' ? '확정' : '작성중'}
                     </span>
                   </td>
-                  <td>{new Date(s.createdAt).toLocaleDateString('ko')}</td>
+                  <td>{new Date(s.created_at).toLocaleDateString('ko-KR')}</td>
                   <td>
-                    <button className="btn btn-outline btn-sm" onClick={() => navigate(`/schedule/${s.id}`)}>
-                      보기
-                    </button>
+                    <button className="btn btn-sm btn-primary" onClick={() => navigate(`/schedules/${s.id}`)}>보기</button>
                   </td>
                 </tr>
               ))}
@@ -86,14 +94,6 @@ export function DashboardPage() {
           </table>
         )}
       </div>
-
-      {isAdmin && (
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-          <button className="btn btn-primary" onClick={() => navigate('/schedule')}>근무표 생성</button>
-          <button className="btn btn-outline" onClick={() => navigate('/nurses')}>간호사 관리</button>
-          <button className="btn btn-outline" onClick={() => navigate('/rules')}>규칙 설정</button>
-        </div>
-      )}
     </div>
   );
 }

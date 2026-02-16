@@ -89,7 +89,21 @@ input:focus, select:focus {
   margin-bottom: 2rem;
 }
 
-.sidebar-nav { flex: 1; }
+.sidebar-nav { flex: 1; display: flex; flex-direction: column; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1.5rem;
+  color: var(--gray-600);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+.nav-item:hover { background: var(--gray-100); color: var(--gray-800); }
+.nav-item.active { background: rgba(74,144,217,0.08); color: var(--primary); font-weight: 600; }
 
 .sidebar-link {
   display: flex;
@@ -381,3 +395,44 @@ tr:hover td { background: var(--gray-50); }
   .page-header h1 { font-size: 1.2rem; }
   .form-row { grid-template-columns: 1fr; }
 }
+
+/* ── 직급 배지 (HN/CN/RN/AN) ──────────────────────── */
+.badge-grade-hn { background: #8E44AD; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+.badge-grade-cn { background: #2980B9; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+.badge-grade-rn { background: #27AE60; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+.badge-grade-an { background: #E67E22; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+
+/* ── 근무 유형 배지 (D/E/N/M/O/Y) ────────────────── */
+.shift-badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+.shift-d { background: #EBF5FB; color: #1A5276; }
+.shift-e { background: #EAFAF1; color: #1E8449; }
+.shift-n { background: #F4ECF7; color: #6C3483; }
+.shift-m { background: #EAF2F8; color: #154360; }
+.shift-o { background: #F2F3F4; color: #566573; }
+.shift-y { background: #FEF9E7; color: #7D6608; }
+.shift-x { background: #FDFEFE; color: #717D7E; }
+
+/* ── 규칙 그리드 ─────────────────────────── */
+.rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .rules-grid { grid-template-columns: 1fr; } }
+
+/* ── 탭 바 ────────────────────────────── */
+.tab-bar { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid #eee; }
+.tab-btn { padding: 8px 20px; background: none; border: none; cursor: pointer; color: #888; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 14px; }
+.tab-btn.active { color: #6C3483; border-bottom-color: #6C3483; font-weight: 600; }
+
+/* ── 소형 입력 ───────────────────────────── */
+.input-sm { width: 70px !important; padding: 4px 6px !important; font-size: 13px !important; }
+.table-compact td, .table-compact th { padding: 6px 8px; }
+
+/* ── 알림 ────────────────────────────── */
+.alert-success { background: #EAFAF1; color: #1E8449; border: 1px solid #A9DFBF; padding: 10px 16px; border-radius: 6px; margin-bottom: 12px; }
+
+/* -- schedule table styles ---------------------------------------- */
+.schedule-table { border-collapse: collapse; font-size: 12px; }
+.schedule-table th, .schedule-table td { border: 1px solid #ddd; padding: 4px; }
+.schedule-table .nurse-col { position: sticky; left: 0; background: #fff; z-index: 1; min-width: 80px; font-weight: 600; padding: 4px 8px; }
+.schedule-table .date-col { min-width: 32px; text-align: center; }
+.schedule-table .date-col.weekend { background: #FEF9E7; }
+.badge-draft { background: #EAF2F8; color: #1A5276; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+.badge-confirmed { background: #EAFAF1; color: #1E8449; padding: 2px 8px; border-radius: 4px; font-size: 12px; }

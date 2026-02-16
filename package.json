@@ -10,11 +10,10 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "npm run dev --workspace=backend",
+    "dev:backend": "cd backend_py && C:/ProgramData/Anaconda3/python.exe -m uvicorn app.main:app --reload --port 3000",
     "dev:frontend": "npm run dev --workspace=frontend",
-    "build": "npm run build --workspace=shared && npm run build --workspace=backend && npm run build --workspace=frontend",
-    "test": "npm run test --workspace=backend",
-    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend"
+    "seed": "cd backend_py && C:/ProgramData/Anaconda3/python.exe seed.py",
+    "test": "npm run test --workspace=frontend"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

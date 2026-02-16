@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
 import { schedules as schedulesApi } from '../api.ts';
 
-export function SchedulePage() {
-  const { user, isAdmin } = useAuth();
+export default function SchedulePage() {
+  const { nurse, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [list, setList] = useState<any[]>([]);
   const [yearMonth, setYearMonth] = useState(() => {
@@ -12,78 +12,92 @@ export function SchedulePage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [genResult, setGenResult] = useState<any>(null);
 
   const loadSchedules = () => {
-    if (user) schedulesApi.list(user.wardId).then(setList).catch(() => {});
+    if (nurse) schedulesApi.list(nurse.ward_id).then(setList).catch(() => {});
   };
 
-  useEffect(loadSchedules, [user]);
+  useEffect(loadSchedules, [nurse]);
 
   const handleGenerate = async () => {
+    if (!nurse) return;
     setGenerating(true);
+    setError('');
+    setGenResult(null);
     try {
-      const result = await schedulesApi.generate(user!.wardId, yearMonth);
-      navigate(`/schedule/${result.schedule.id}`);
-    } catch (err: any) {
-      alert(err.message || '근무표 생성 실패');
+      const result = await schedulesApi.generate(nurse.ward_id, yearMonth);
+      setGenResult(result);
+      loadSchedules();
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setGenerating(false);
     }
   };
 
   return (
-    <div>
+    <div className="page">
       <div className="page-header">
-        <h1>근무표</h1>
+        <h2>근무표</h2>
       </div>
 
       {isAdmin && (
-        <div className="card">
-          <div className="card-title">근무표 자동 생성</div>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h3 className="card-title">근무표 자동 생성</h3>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label>대상 연월</label>
-              <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} />
+              <input type="month" className="form-control" value={yearMonth}
+                onChange={(e) => setYearMonth(e.target.value)} />
             </div>
             <button className="btn btn-primary" onClick={handleGenerate} disabled={generating}>
-              {generating ? '생성 중...' : '자동 생성'}
+              {generating ? '생성 중... (10~30초 소요)' : '자동 생성'}
             </button>
           </div>
-          {generating && (
-            <p style={{ marginTop: '0.75rem', color: 'var(--gray-600)', fontSize: '0.85rem' }}>
-              SA 알고리즘으로 최적 근무표를 생성하고 있습니다...
-            </p>
+          {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}
+          {genResult && (
+            <div className={`alert ${genResult.hard_violations > 0 ? 'alert-error' : 'alert-success'}`} style={{ marginTop: 12 }}>
+              생성 완료 — 하드 위반: {genResult.hard_violations}건, 점수: {genResult.score?.toFixed(1)}
+              {genResult.hard_violations > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  {genResult.violations?.slice(0, 5).map((v: any, i: number) => (
+                    <div key={i} style={{ fontSize: 12 }}>• {v.message}</div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
 
       <div className="card">
-        <div className="card-title">근무표 목록</div>
+        <h3 className="card-title">근무표 목록</h3>
         {list.length === 0 ? (
-          <p style={{ color: 'var(--gray-500)', fontSize: '0.875rem' }}>근무표가 없습니다.</p>
+          <p style={{ color: '#aaa' }}>생성된 근무표가 없습니다.</p>
         ) : (
-          <table>
+          <table className="table">
             <thead>
-              <tr>
-                <th>연월</th>
-                <th>상태</th>
-                <th>생성일</th>
-                <th></th>
-              </tr>
+              <tr><th>연월</th><th>상태</th><th>생성일</th><th>보기</th></tr>
             </thead>
             <tbody>
-              {list.map(s => (
+              {list.map((s) => (
                 <tr key={s.id}>
-                  <td style={{ fontWeight: 600 }}>{s.yearMonth}</td>
+                  <td>{s.year_month}</td>
                   <td>
-                    <span className={`badge badge-${s.status.toLowerCase()}`}>
-                      {s.status === 'DRAFT' ? '작성중' : '확정'}
+                    <span className={s.status === 'CONFIRMED' ? 'badge-confirmed' : 'badge-draft'}
+                      style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12,
+                        background: s.status === 'CONFIRMED' ? '#EAFAF1' : '#EAF2F8',
+                        color: s.status === 'CONFIRMED' ? '#1E8449' : '#1A5276' }}>
+                      {s.status === 'CONFIRMED' ? '확정' : '작성중'}
                     </span>
                   </td>
-                  <td>{new Date(s.createdAt).toLocaleDateString('ko')}</td>
-                  <td style={{ display: 'flex', gap: '0.25rem' }}>
-                    <button className="btn btn-outline btn-sm" onClick={() => navigate(`/schedule/${s.id}`)}>보기</button>
-                    <button className="btn btn-outline btn-sm" onClick={() => navigate(`/stats/${s.id}`)}>통계</button>
+                  <td>{new Date(s.created_at).toLocaleDateString('ko-KR')}</td>
+                  <td>
+                    <button className="btn btn-sm btn-primary" onClick={() => navigate(`/schedules/${s.id}`)}>
+                      보기
+                    </button>
                   </td>
                 </tr>
               ))}

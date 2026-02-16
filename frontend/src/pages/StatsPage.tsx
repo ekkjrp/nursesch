@@ -1,144 +1,110 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.tsx';
 import { schedules as schedulesApi } from '../api.ts';
 
-// 통계 및 공정성 대시보드 (designreq.md FR-8)
-export function StatsPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+const GRADE_LABEL: Record<string, string> = { HN: '수간호사', CN: '책임간호사', RN: '평간호사', AN: '보조간호사' };
+
+export default function StatsPage() {
+  const { nurse } = useAuth();
+  const [scheduleList, setScheduleList] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [stats, setStats] = useState<any[]>([]);
-  const [schedule, setSchedule] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    schedulesApi.get(Number(id)).then(setSchedule).catch(() => {});
-    schedulesApi.stats(Number(id)).then(setStats).catch(() => {});
-  }, [id]);
+    if (nurse) schedulesApi.list(nurse.ward_id).then(setScheduleList).catch(() => {});
+  }, [nurse]);
 
-  if (!stats.length) return <div className="loading">로딩 중...</div>;
-
-  // 전체 통계 계산
-  const totalNurses = stats.length;
-  const avgWork = (stats.reduce((s, n) => s + n.totalWorkDays, 0) / totalNurses).toFixed(1);
-  const avgOff = (stats.reduce((s, n) => s + n.offDays, 0) / totalNurses).toFixed(1);
-  const totalRequests = stats.reduce((s, n) => s + n.requestCount, 0);
-  const totalFulfilled = stats.reduce((s, n) => s + n.requestFulfilled, 0);
-  const fulfillRate = totalRequests > 0 ? Math.round((totalFulfilled / totalRequests) * 100) : 100;
-
-  // D/E/N 편차 계산
-  const calcStdDev = (key: string) => {
-    const values = stats.map(s => s.shiftCounts[key] || 0);
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    const variance = values.reduce((a, v) => a + Math.pow(v - avg, 2), 0) / values.length;
-    return Math.sqrt(variance).toFixed(1);
+  const loadStats = async (id: number) => {
+    setSelectedId(id);
+    setLoading(true);
+    try {
+      const data = await schedulesApi.stats(id);
+      setStats(data);
+    } catch {}
+    finally { setLoading(false); }
   };
 
+  const selectedSchedule = scheduleList.find((s) => s.id === selectedId);
+
   return (
-    <div>
+    <div className="page">
       <div className="page-header">
-        <h1>{schedule?.yearMonth} 통계 대시보드</h1>
-        <button className="btn btn-outline" onClick={() => navigate(`/schedule/${id}`)}>근무표 보기</button>
+        <h2>통계 대시보드</h2>
+        <select className="form-control" style={{ width: 160 }}
+          value={selectedId || ''}
+          onChange={(e) => loadStats(Number(e.target.value))}>
+          <option value="">근무표 선택</option>
+          {scheduleList.map((s) => (
+            <option key={s.id} value={s.id}>{s.year_month} ({s.status === 'CONFIRMED' ? '확정' : '작성중'})</option>
+          ))}
+        </select>
       </div>
 
-      <div className="stat-grid">
-        <div className="stat-card">
-          <div className="stat-value">{totalNurses}명</div>
-          <div className="stat-label">간호사 수</div>
+      {selectedSchedule && (
+        <div style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>
+          {selectedSchedule.year_month} 근무표 통계
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{avgWork}일</div>
-          <div className="stat-label">평균 근무일</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{avgOff}일</div>
-          <div className="stat-label">평균 휴무일</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: fulfillRate >= 80 ? 'var(--success)' : 'var(--danger)' }}>
-            {fulfillRate}%
-          </div>
-          <div className="stat-label">요청 반영률</div>
-        </div>
-      </div>
+      )}
 
-      {/* 공정성 지표: 근무 유형별 편차 */}
-      <div className="card">
-        <div className="card-title">공정성 지표 (근무 유형별 표준편차)</div>
-        <div style={{ display: 'flex', gap: '2rem', fontSize: '0.875rem' }}>
-          <div>
-            <span style={{ color: 'var(--shift-d)', fontWeight: 700 }}>D</span> 편차: {calcStdDev('D')}
-          </div>
-          <div>
-            <span style={{ color: 'var(--shift-e)', fontWeight: 700 }}>E</span> 편차: {calcStdDev('E')}
-          </div>
-          <div>
-            <span style={{ color: 'var(--shift-n)', fontWeight: 700 }}>N</span> 편차: {calcStdDev('N')}
-          </div>
-        </div>
-      </div>
-
-      {/* 간호사별 상세 통계 */}
-      <div className="card">
-        <div className="card-title">간호사별 상세 통계</div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>이름</th>
-                <th style={{ textAlign: 'center', color: 'var(--shift-d)' }}>D</th>
-                <th style={{ textAlign: 'center', color: 'var(--shift-e)' }}>E</th>
-                <th style={{ textAlign: 'center', color: 'var(--shift-n)' }}>N</th>
-                <th style={{ textAlign: 'center' }}>O</th>
-                <th style={{ textAlign: 'center' }}>총 근무</th>
-                <th style={{ textAlign: 'center' }}>주말 근무</th>
-                <th style={{ textAlign: 'center' }}>요청 반영</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.map(s => (
-                <tr key={s.nurseId}>
-                  <td style={{ fontWeight: 600 }}>{s.nurseName}</td>
-                  <td style={{ textAlign: 'center' }}>{s.shiftCounts.D}</td>
-                  <td style={{ textAlign: 'center' }}>{s.shiftCounts.E}</td>
-                  <td style={{ textAlign: 'center' }}>{s.shiftCounts.N}</td>
-                  <td style={{ textAlign: 'center' }}>{s.shiftCounts.O}</td>
-                  <td style={{ textAlign: 'center', fontWeight: 600 }}>{s.totalWorkDays}</td>
-                  <td style={{ textAlign: 'center' }}>{s.weekendWorkDays}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    {s.requestCount > 0
-                      ? `${s.requestFulfilled}/${s.requestCount}`
-                      : '-'}
-                  </td>
+      {loading ? <p>로딩 중...</p> : stats.length === 0 ? (
+        <p style={{ color: '#aaa' }}>근무표를 선택하세요.</p>
+      ) : (
+        <div className="card">
+          <h3 className="card-title">간호사별 근무 통계</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>이름</th><th>직급</th>
+                  <th style={{ color: '#1A5276' }}>데이(D)</th>
+                  <th style={{ color: '#1E8449' }}>이브닝(E)</th>
+                  <th style={{ color: '#6C3483' }}>나이트(N)</th>
+                  <th style={{ color: '#154360' }}>미드(M)</th>
+                  <th style={{ color: '#566573' }}>오프(O)</th>
+                  <th style={{ color: '#7D6608' }}>연차(Y)</th>
+                  <th>총비근무</th>
+                  <th>주말근무</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              </thead>
+              <tbody>
+                {stats.map((s) => (
+                  <tr key={s.nurse_id}>
+                    <td>{s.nurse_name}</td>
+                    <td><span style={{ fontSize: 12 }}>{s.grade} ({GRADE_LABEL[s.grade] || s.grade})</span></td>
+                    <td style={{ textAlign: 'center', background: '#EBF5FB' }}>{s.d_count}</td>
+                    <td style={{ textAlign: 'center', background: '#EAFAF1' }}>{s.e_count}</td>
+                    <td style={{ textAlign: 'center', background: '#F4ECF7' }}>{s.n_count}</td>
+                    <td style={{ textAlign: 'center', background: '#EAF2F8' }}>{s.m_count}</td>
+                    <td style={{ textAlign: 'center', background: '#F2F3F4' }}>{s.o_count}</td>
+                    <td style={{ textAlign: 'center', background: '#FEF9E7' }}>{s.y_count}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 600 }}>{s.total_off}</td>
+                    <td style={{ textAlign: 'center' }}>{s.weekend_work}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      {/* 근무 분포 바 차트 (간단한 CSS 바) */}
-      <div className="card">
-        <div className="card-title">근무 분포</div>
-        {stats.map(s => {
-          const total = s.shiftCounts.D + s.shiftCounts.E + s.shiftCounts.N + s.shiftCounts.O;
-          return (
-            <div key={s.nurseId} style={{ marginBottom: '0.75rem' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>{s.nurseName}</div>
-              <div style={{ display: 'flex', height: 20, borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: `${(s.shiftCounts.D / total) * 100}%`, background: 'var(--shift-d)' }} title={`D: ${s.shiftCounts.D}`} />
-                <div style={{ width: `${(s.shiftCounts.E / total) * 100}%`, background: 'var(--shift-e)' }} title={`E: ${s.shiftCounts.E}`} />
-                <div style={{ width: `${(s.shiftCounts.N / total) * 100}%`, background: 'var(--shift-n)' }} title={`N: ${s.shiftCounts.N}`} />
-                <div style={{ width: `${(s.shiftCounts.O / total) * 100}%`, background: 'var(--shift-o)' }} title={`O: ${s.shiftCounts.O}`} />
-              </div>
-            </div>
-          );
-        })}
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', fontSize: '0.75rem' }}>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--shift-d)', borderRadius: 2, marginRight: 4 }} />D 낮번</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--shift-e)', borderRadius: 2, marginRight: 4 }} />E 저녁번</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--shift-n)', borderRadius: 2, marginRight: 4 }} />N 밤번</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--shift-o)', borderRadius: 2, marginRight: 4 }} />O 휴무</span>
+          {/* 간단한 막대 차트 */}
+          <h3 className="card-title" style={{ marginTop: 24 }}>데이 근무 분포</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            {stats.map((s) => {
+              const max = Math.max(...stats.map((x) => x.d_count), 1);
+              const height = (s.d_count / max) * 80;
+              return (
+                <div key={s.nurse_id} style={{ textAlign: 'center', minWidth: 40 }}>
+                  <div style={{ height: 80, display: 'flex', alignItems: 'flex-end' }}>
+                    <div style={{ width: 32, height, background: '#4A90D9', borderRadius: '3px 3px 0 0', margin: '0 auto' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: '#555' }}>{s.nurse_name.slice(0, 2)}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600 }}>{s.d_count}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
