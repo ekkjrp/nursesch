@@ -33,3 +33,9 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 .claude/
+
+# Backup (old Express backend & unused files)
+backup/
+
+# Legacy empty backend dir (locked, pending deletion)
+backend/
