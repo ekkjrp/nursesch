@@ -91,6 +91,36 @@ INFO:     Uvicorn running on http://0.0.0.0:3000
 
 두 메시지가 모두 표시되어야 합니다.
 
+#### 서버 종료
+
+**`npm run dev`로 동시 실행한 경우:**
+- 서버가 실행 중인 터미널에서 **`Ctrl + C`** 를 누르면 백엔드(uvicorn)와 프론트엔드(Vite)가 **모두 동시에 종료**됩니다.
+
+**개별 실행(`dev:backend`, `dev:frontend`)한 경우:**
+- 각 터미널에서 **`Ctrl + C`** 를 눌러 개별 종료합니다.
+
+**비정상 종료 후 포트가 사용 중일 때:**
+
+서버를 정상 종료하지 못한 경우 "포트가 이미 사용 중입니다" 오류가 발생할 수 있습니다. 이때는 해당 포트를 사용하는 프로세스를 찾아 강제 종료합니다.
+
+```bash
+# Windows (CMD 또는 PowerShell)
+# 1. 포트를 사용하는 프로세스 PID 확인
+netstat -ano | findstr :3000    # 백엔드
+netstat -ano | findstr :5173    # 프론트엔드
+
+# 2. 해당 PID 강제 종료
+taskkill /PID <PID번호> /F
+
+# Git Bash / MSYS2
+# 1. 포트를 사용하는 프로세스 확인
+netstat -ano | grep :3000
+netstat -ano | grep :5173
+
+# 2. 해당 PID 강제 종료
+taskkill //PID <PID번호> //F
+```
+
 ### 1.3 초기 계정 정보
 
 시드 데이터로 생성되는 기본 계정입니다.
